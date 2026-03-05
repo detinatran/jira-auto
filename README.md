@@ -38,21 +38,7 @@ def list_tasks(
     return json.dumps(result)
 ```
 
-Khi bạn hỏi "Show tasks assigned to duong with high priority", Gemini sẽ:
 
-1. Parse intent của bạn, biết cần gọi `list_tasks()`
-2. Generate function call JSON:
-   ```json
-   {
-     "name": "list_tasks",
-     "arguments": {
-       "assignee": "duong",
-       "priority": "High"
-     }
-   }
-   ```
-3. SDK execute Python function với arguments đó
-4. Return result dạng JSON, Gemini format thành natural language
 
 **10 tool functions available:**
 
