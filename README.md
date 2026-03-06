@@ -2,9 +2,14 @@
 
 Hệ thống tự động sync tasks giữa Google Sheets và Jira Cloud, tích hợp Gemini AI để query và quản lý tasks bằng ngôn ngữ tự nhiên.
 
-## Demo
+## Link 1: Sheet
 
-📊 **Google Sheet:** [Jira Integration Sheet](https://docs.google.com/spreadsheets/d/1IMWZ3POaPCHt2Gqa07QtRMLKCpcPcTXE01Q2WwH-uZY)
+**Google Sheet:** [Jira Integration Sheet](https://docs.google.com/spreadsheets/d/1IMWZ3POaPCHt2GqaO7QtRMLKCpcPcTXEO1Q2WwH-uZY/edit?gid=34214529#gid=34214529)
+## Link 2: jira
+
+ **Google Sheet:** [Jira ](https://ad-corner.atlassian.net/jira/software/projects/KAN/list?jql=project%20%3D%20KAN%20AND%20assignee%20%3D%20EMPTY%20ORDER%20BY%20cf%5B10019%5D%20ASC)
+
+
 
 ### Chat Interface
 ![Chat Demo](image.png)
