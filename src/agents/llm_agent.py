@@ -6,7 +6,9 @@ the Gemini model decides which tool to call, the SDK executes the Python
 function, and feeds the result back — all in a single `chat.send_message`.
 """
 
-from __future__ import annotations
+# NOTE: Do NOT use `from __future__ import annotations` here.
+# The Gemini SDK inspects function annotations at runtime to build
+# the function-calling schema, and it needs real types, not strings.
 
 import json
 import logging
@@ -31,7 +33,7 @@ MAX_RETRIES = 3
 # Each function has a clear docstring + typed params so Gemini can
 # auto-generate the JSON schema for function calling.
 
-_sheet_data: SheetData | None = None  # cached per session
+_sheet_data: Optional[SheetData] = None  # cached per session
 
 
 def _load_data() -> SheetData:
