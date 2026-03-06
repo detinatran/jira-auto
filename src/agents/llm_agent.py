@@ -228,7 +228,7 @@ def create_jira_issue(
     """Create a new Jira issue.
 
     Args:
-        project_key: Jira project key (e.g. AIM, MAR, DBM).
+        project_key: Jira project key (e.g. KAN, MJLP) or project ID (e.g. PROJ001).
         summary: Brief title of the issue.
         description: Detailed description.
         assignee_name: Name of the assignee (must match team member name).
@@ -243,6 +243,19 @@ def create_jira_issue(
         })
 
     data = _load_data()
+
+    # Auto-resolve: if user passes project_id (e.g. PROJ001), find the Jira key
+    resolved_key = project_key
+    for p in data.projects:
+        if (p.project_id or "").upper() == project_key.upper():
+            resolved_key = p.jira_project_key
+            log.info(f"Resolved project_id {project_key} → Jira key {resolved_key}")
+            break
+        if (p.project_name or "").lower() == project_key.lower():
+            resolved_key = p.jira_project_key
+            log.info(f"Resolved project_name '{project_key}' → Jira key {resolved_key}")
+            break
+
     account_id = None
     if assignee_name:
         member = sheet.get_team_member(assignee_name, data)
@@ -250,7 +263,7 @@ def create_jira_issue(
             account_id = member.jira_account_id
 
     resp = jira.create_issue(
-        project_key=project_key,
+        project_key=resolved_key,
         summary=summary,
         description=description,
         assignee_account_id=account_id,
@@ -371,9 +384,12 @@ Guidelines:
 3. Present information in a clear, concise, tabular format when possible.
 4. If Jira credentials are not configured, explain that you are using local
    sheet data and that write operations will be simulated (dry-run).
-5. For create/update operations, confirm what you plan to do before executing
-   (unless the user explicitly says "just do it").
+5. For create/update operations, execute them directly without asking
+   for confirmation (the user already told you what to do).
 6. Always mention the task_id and jira_issue_key when referring to a task.
+7. When creating issues, you can pass either the Jira project key (e.g. KAN, MJLP)
+   or the project ID (e.g. PROJ001) — the system will auto-resolve it.
+8. If a tool returns an error JSON, tell the user what went wrong specifically.
 """
 
 # ════════════════════════════════════════════════════════════════════════════

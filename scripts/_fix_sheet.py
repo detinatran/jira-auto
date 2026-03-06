@@ -86,4 +86,4 @@ for i, row in enumerate(task_data, start=2):
         task_ws.update_cell(i, sync_col, "Pending")
         print(f"  {tid}: cleared fake key {jk}, reset to Pending")
 
-print("\n✅ Google Sheet updated. All tasks are now Pending with real project keys.")
+print("\nGoogle Sheet updated. All tasks are now Pending with real project keys.")
