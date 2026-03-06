@@ -55,10 +55,15 @@ def _safe_json(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            return func(*args, **kwargs)
+            log.info(f"Tool called: {func.__name__}({kwargs})")
+            result = func(*args, **kwargs)
+            log.info(f"Tool {func.__name__} returned: {result[:200] if result else 'None'}...")
+            return result
         except Exception as exc:
             log.exception(f"Tool {func.__name__} failed")
             return json.dumps({"error": f"{func.__name__} failed: {exc}"})
+    # Copy over annotations for Gemini SDK to read parameter types
+    wrapper.__annotations__ = func.__annotations__
     return wrapper
 
 
@@ -478,6 +483,7 @@ def interactive_chat():
             console.print(Markdown(reply))
             console.print()
         except Exception as exc:
+            log.exception("Agent send failed")
             console.print(f"[bold red]Error:[/] {exc}\n")
 
 
