@@ -79,14 +79,20 @@ def list_tasks(
     data = _load_data()
     tasks = data.tasks
 
+    # Gemini may pass None for unused optional params
+    project_id = project_id or ""
+    assignee = assignee or ""
+    status = status or ""
+    priority = priority or ""
+
     if project_id:
-        tasks = [t for t in tasks if t.project_id.lower() == project_id.lower()]
+        tasks = [t for t in tasks if (t.project_id or "").lower() == project_id.lower()]
     if assignee:
-        tasks = [t for t in tasks if t.assignee.lower() == assignee.lower()]
+        tasks = [t for t in tasks if (t.assignee or "").lower() == assignee.lower()]
     if status:
-        tasks = [t for t in tasks if t.status.lower() == status.lower()]
+        tasks = [t for t in tasks if (t.status or "").lower() == status.lower()]
     if priority:
-        tasks = [t for t in tasks if t.priority.lower() == priority.lower()]
+        tasks = [t for t in tasks if (t.priority or "").lower() == priority.lower()]
 
     result = [
         {
@@ -112,8 +118,9 @@ def get_task_detail(task_id: str) -> str:
         task_id: The task ID, e.g. T001.
     """
     data = _load_data()
+    task_id = task_id or ""
     for t in data.tasks:
-        if t.task_id.upper() == task_id.upper():
+        if (t.task_id or "").upper() == task_id.upper():
             from dataclasses import asdict
             return json.dumps(asdict(t), indent=2)
     return json.dumps({"error": f"Task {task_id} not found"})
@@ -149,8 +156,9 @@ def get_sync_log(task_id: str = "") -> str:
     """
     data = _load_data()
     logs = data.sync_log
+    task_id = task_id or ""
     if task_id:
-        logs = [l for l in logs if l.task_id.upper() == task_id.upper()]
+        logs = [l for l in logs if (l.task_id or "").upper() == task_id.upper()]
     result = [
         {
             "log_id": l.log_id,
