@@ -12,16 +12,16 @@ Hệ thống tự động sync tasks giữa Google Sheets và Jira Cloud, tích 
 
 
 ### Chat Interface
-![Chat Demo](image.png)
+![Chat Demo](images/image.png)
 
 ### Result
-![Result](demo.jpg)
+![Result](images/demo.jpg)
 
 ### Jira Board
-![Jira Board](jira.jpg)
+![Jira Board](images/jira.jpg)
 
 ### Google Sheet
-![Google Sheet](sheet.jpg)
+![Google Sheet](images/sheet.jpg)
 
 ## Features
 
