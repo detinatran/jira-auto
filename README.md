@@ -27,15 +27,17 @@ Hệ thống tự động sync tasks giữa Google Sheets và Jira Cloud, tích 
 
 ### Bi-directional Sync
 - Sync tasks từ Google Sheets sang Jira Cloud
+- **Auto-sync** với webhooks (Jira + Google Apps Script)
 - Tự động map các field: assignee, reporter, priority, status
 - Smart status transitions (tự detect workflow của từng Jira project)
 - Tạo issue mới hoặc update issue có sẵn
 
 ### AI Assistant với Function Calling
-- Dùng Gemini 2.5 Flash với automatic function calling
+- Support cả **OpenAI** (preferred) và **Gemini**
 - Query bằng câu tự nhiên: "Show me all tasks assigned to duong"
 - Tạo/update Jira issues qua conversation
 - Query projects, tasks, team members, sync logs
+- No rate limits với OpenAI paid tier
 
 **Cách LLM generate JSON để query/update data:**
 
@@ -92,7 +94,13 @@ TOOLS = [
 ]
 ```
 
-Không cần viết JSON thủ công. Describe what you want bằng tiếng Việt/Anh bình thường, Gemini tự handle function selection và argument generation qua `google-genai` SDK.
+Không cần viết JSON thủ công. Describe what you want bằng tiếng Việt/Anh bình thường, AI tự handle function selection và argument generation.
+
+### Auto-Sync với Webhooks
+- **Jira Webhooks**: Tự động trigger sync khi Jira issue thay đổi
+- **Google Apps Script**: Trigger khi Sheet được edit
+- **Real-time**: Changes được sync ngay lập tức, không cần chạy manual
+- **Setup guide**: Xem chi tiết trong [docs/AUTO_SYNC_SETUP.md](docs/AUTO_SYNC_SETUP.md)
 
 ### Reporting & Analytics
 - Real-time dashboard với task statistics
@@ -144,7 +152,13 @@ JIRA_API_TOKEN=your_jira_api_token
 GOOGLE_SHEET_ID=your_google_sheet_id
 GOOGLE_SERVICE_ACCOUNT_FILE=./service_account.json
 
-GOOGLE_API_KEY=your_gemini_api_key
+# AI Provider (required: either OpenAI or Gemini)
+OPENAI_API_KEY=sk-proj-xxxxx  # Preferred
+GOOGLE_API_KEY=your_gemini_api_key  # Fallback
+
+# Auto-sync (optional, for webhook server)
+WEBHOOK_SECRET=your-secret-token-change-this
+WEBHOOK_PORT=5000
 ```
 
 ### 3. Setup Google Sheets API
@@ -159,10 +173,20 @@ GOOGLE_API_KEY=your_gemini_api_key
 1. Vào Atlassian API Tokens
 2. Create token, copy vào `.env`
 
-### 5. Get Gemini API Key
+### 5. Get AI API Keys
 
-1. Visit Google AI Studio
-2. Create API key, copy vào `.env`
+**OpenAI (Recommended):**
+1. Visit [OpenAI Platform](https://platform.openai.com)
+2. Create API key, copy vào `.env` as `OPENAI_API_KEY`
+
+**Gemini (Alternative):**
+1. Visit [Google AI Studio](https://aistudio.google.com)
+2. Create API key, copy vào `.env` as `GOOGLE_API_KEY`
+
+### 6. (Optional) Setup Auto-Sync
+
+Để enable auto-sync khi Sheet hoặc Jira thay đổi, xem guide chi tiết:
+- [docs/AUTO_SYNC_SETUP.md](docs/AUTO_SYNC_SETUP.md)
 
 ---
 
