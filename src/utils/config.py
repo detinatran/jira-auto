@@ -18,6 +18,9 @@ JIRA_API_TOKEN: str = os.getenv("JIRA_API_TOKEN", "")
 # ── Google AI Studio (Gemini) ──────────────────────────────────────────────
 GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
 
+# ── OpenAI API ──────────────────────────────────────────────────────────────
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
 # ── Google Sheet ────────────────────────────────────────────────────────────
 GOOGLE_SHEET_ID: str = os.getenv(
     "GOOGLE_SHEET_ID", "18parvs_us8AR9GS_ORZUtvGtkFND9qaF"
@@ -36,6 +39,16 @@ def validate_jira_config() -> bool:
 def validate_gemini_config() -> bool:
     """Return True when the Google AI Studio key is present."""
     return bool(GOOGLE_API_KEY)
+
+
+def validate_openai_config() -> bool:
+    """Return True when the OpenAI API key is present."""
+    return bool(OPENAI_API_KEY)
+
+
+def validate_ai_config() -> bool:
+    """Return True when either Gemini or OpenAI key is present."""
+    return bool(GOOGLE_API_KEY or OPENAI_API_KEY)
 
 
 def validate_google_sheet_config() -> bool:

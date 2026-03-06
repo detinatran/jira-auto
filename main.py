@@ -63,10 +63,10 @@ def cmd_dashboard(args):
 
 def cmd_chat(args):
     """Start the interactive LLM agent chat."""
-    if not config.validate_gemini_config():
+    if not config.validate_ai_config():
         console.print(
-            "[bold red]Error:[/] GOOGLE_API_KEY not set.\n"
-            "Please add it to your .env file (see .env.example).\n"
+            "[bold red]Error:[/] No AI API key configured.\n"
+            "Please set OPENAI_API_KEY or GOOGLE_API_KEY in your .env file.\n"
         )
         sys.exit(1)
 

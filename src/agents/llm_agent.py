@@ -1,9 +1,8 @@
 """
-llm_agent.py — Gemini-powered agent that can query and update Jira data.
+llm_agent.py — AI-powered agent that can query and update Jira data.
 
-Uses Google AI Studio (google-genai SDK) with **automatic function calling**:
-the Gemini model decides which tool to call, the SDK executes the Python
-function, and feeds the result back — all in a single `chat.send_message`.
+Supports both OpenAI and Google Gemini with automatic function calling.
+Prefers OpenAI if OPENAI_API_KEY is set, falls back to Gemini.
 """
 
 # NOTE: Do NOT use `from __future__ import annotations` here.
@@ -15,8 +14,18 @@ import logging
 import time
 from typing import Optional
 
-from google import genai
-from google.genai import types
+try:
+    from openai import OpenAI
+    HAS_OPENAI = True
+except ImportError:
+    HAS_OPENAI = False
+
+try:
+    from google import genai
+    from google.genai import types
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
 
 from src.utils import config
 from src.core import jira_client as jira
@@ -282,15 +291,19 @@ def update_jira_issue(
     summary: str = "",
     priority: str = "",
     status: str = "",
+    assignee_name: str = "",
+    due_date: str = "",
     comment: str = "",
 ) -> str:
     """Update an existing Jira issue.
 
     Args:
-        issue_key: Jira issue key (e.g. AIM-23).
+        issue_key: Jira issue key (e.g. KAN-13).
         summary: New summary / title (leave empty to keep current).
         priority: New priority (leave empty to keep current).
         status: Transition to this status (e.g. In Progress, Done).
+        assignee_name: New assignee name (must match team member name).
+        due_date: New due date in YYYY-MM-DD format.
         comment: Add a comment to the issue.
     """
     if not config.validate_jira_config():
@@ -299,14 +312,22 @@ def update_jira_issue(
             "message": f"Would update {issue_key}. Jira credentials not configured.",
         })
 
+    data = _load_data()
     results = {}
 
     # Update fields
-    fields: dict = {}
+    fields = {}
     if summary:
         fields["summary"] = summary
     if priority:
         fields["priority"] = {"name": priority}
+    if assignee_name:
+        member = sheet.get_team_member(assignee_name, data)
+        if member:
+            fields["assignee"] = {"accountId": member.jira_account_id}
+    if due_date:
+        fields["duedate"] = due_date
+    
     if fields:
         results["field_update"] = jira.update_issue(issue_key, fields=fields)
 
@@ -399,38 +420,153 @@ Guidelines:
 # ════════════════════════════════════════════════════════════════════════════
 
 class JiraAgent:
-    """Interactive chat agent backed by Gemini + function calling."""
+    """Interactive chat agent backed by OpenAI or Gemini with function calling."""
 
-    def __init__(self, model: str = "gemini-2.5-flash"):
-        if not config.validate_gemini_config():
-            raise RuntimeError(
-                "GOOGLE_API_KEY is not set. "
-                "Please add it to .env (see .env.example)."
+    def __init__(self, model: Optional[str] = None, provider: Optional[str] = None):
+        """Initialize agent with OpenAI (preferred) or Gemini.
+        
+        Args:
+            model: Model name (auto-selected if None)
+            provider: 'openai' or 'gemini' (auto-detected if None)
+        """
+        # Auto-detect provider
+        if provider is None:
+            if config.OPENAI_API_KEY and HAS_OPENAI:
+                provider = 'openai'
+            elif config.GOOGLE_API_KEY and HAS_GEMINI:
+                provider = 'gemini'
+            else:
+                raise RuntimeError(
+                    "No AI API key configured. "
+                    "Please set OPENAI_API_KEY or GOOGLE_API_KEY in .env"
+                )
+        
+        self._provider = provider
+        
+        if provider == 'openai':
+            if not HAS_OPENAI:
+                raise RuntimeError("openai package not installed. Run: pip install openai")
+            if not config.OPENAI_API_KEY:
+                raise RuntimeError("OPENAI_API_KEY not set in .env")
+            
+            self._model = model or "gpt-4o-mini"
+            self._client = OpenAI(api_key=config.OPENAI_API_KEY)
+            self._messages = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
+            log.info(f"Initialized OpenAI agent with model: {self._model}")
+            
+        elif provider == 'gemini':
+            if not HAS_GEMINI:
+                raise RuntimeError("google-genai package not installed")
+            if not config.GOOGLE_API_KEY:
+                raise RuntimeError("GOOGLE_API_KEY not set in .env")
+            
+            self._model = model or "gemini-2.5-flash"
+            self._client = genai.Client(api_key=config.GOOGLE_API_KEY)
+            self._chat = self._client.chats.create(
+                model=self._model,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION,
+                    tools=TOOLS,
+                    temperature=0.2,
+                ),
             )
-
-        self._client = genai.Client(api_key=config.GOOGLE_API_KEY)
-        self._model = model
-        self._chat = self._client.chats.create(
-            model=self._model,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                tools=TOOLS,
-                temperature=0.2,
-            ),
-        )
+            log.info(f"Initialized Gemini agent with model: {self._model}")
+        else:
+            raise ValueError(f"Unknown provider: {provider}")
+        
         # Pre-load sheet data
         _load_data()
 
     def send(self, message: str) -> str:
         """Send a user message and return the assistant's text reply.
-
-        The SDK's automatic function calling handles tool invocation
-        transparently — Gemini decides which function to call, the SDK
-        executes it locally, sends the result back, and returns the
-        final text response.
-
-        Includes retry logic for rate-limit (429) errors.
+        
+        Supports automatic function calling for both OpenAI and Gemini.
         """
+        if self._provider == 'openai':
+            return self._send_openai(message)
+        else:
+            return self._send_gemini(message)
+    
+    def _send_openai(self, message: str) -> str:
+        """Send message using OpenAI with function calling."""
+        self._messages.append({"role": "user", "content": message})
+        
+        # Convert TOOLS to OpenAI format
+        tools_openai = []
+        for func in TOOLS:
+            import inspect
+            sig = inspect.signature(func)
+            params = {}
+            required = []
+            
+            for name, param in sig.parameters.items():
+                param_type = "string"  # default
+                if param.annotation == int:
+                    param_type = "integer"
+                elif param.annotation == float:
+                    param_type = "number"
+                elif param.annotation == bool:
+                    param_type = "boolean"
+                
+                params[name] = {"type": param_type}
+                if param.default == inspect.Parameter.empty:
+                    required.append(name)
+            
+            tools_openai.append({
+                "type": "function",
+                "function": {
+                    "name": func.__name__,
+                    "description": (func.__doc__ or "").split("\n\n")[0].strip(),
+                    "parameters": {
+                        "type": "object",
+                        "properties": params,
+                        "required": required,
+                    }
+                }
+            })
+        
+        # Call OpenAI with tools
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=self._messages,
+            tools=tools_openai,
+            temperature=0.2,
+        )
+        
+        message_obj = response.choices[0].message
+        
+        # Handle function calls
+        if message_obj.tool_calls:
+            self._messages.append(message_obj)
+            
+            for tool_call in message_obj.tool_calls:
+                func_name = tool_call.function.name
+                args = json.loads(tool_call.function.arguments)
+                
+                # Find and call the function
+                func = next((f for f in TOOLS if f.__name__ == func_name), None)
+                if func:
+                    log.info(f"OpenAI calling tool: {func_name}({args})")
+                    result = func(**args)
+                    self._messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": result,
+                    })
+            
+            # Get final response after function calls
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=self._messages,
+                temperature=0.2,
+            )
+            message_obj = response.choices[0].message
+        
+        self._messages.append({"role": "assistant", "content": message_obj.content})
+        return message_obj.content or "(no response)"
+    
+    def _send_gemini(self, message: str) -> str:
+        """Send message using Gemini with function calling (includes retry)."""
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 response = self._chat.send_message(message)
@@ -453,14 +589,17 @@ class JiraAgent:
 
     def reset(self):
         """Start a fresh conversation."""
-        self._chat = self._client.chats.create(
-            model=self._model,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                tools=TOOLS,
-                temperature=0.2,
-            ),
-        )
+        if self._provider == 'openai':
+            self._messages = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
+        else:
+            self._chat = self._client.chats.create(
+                model=self._model,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION,
+                    tools=TOOLS,
+                    temperature=0.2,
+                ),
+            )
         _reload_data()
 
 
@@ -474,10 +613,12 @@ def interactive_chat():
     from rich.markdown import Markdown
 
     console = Console()
-    console.print("[bold cyan]🤖 Jira Assistant[/] (Gemini + Function Calling)")
-    console.print("Type [bold]quit[/] or [bold]exit[/] to leave.\n")
-
+    
     agent = JiraAgent()
+    provider_name = "OpenAI" if agent._provider == "openai" else "Gemini"
+    console.print(f"[bold cyan]🤖 Jira Assistant[/] ({provider_name} + Function Calling)")
+    console.print(f"Model: [dim]{agent._model}[/]")
+    console.print("Type [bold]quit[/] or [bold]exit[/] to leave.\n")
 
     while True:
         try:
