@@ -17,9 +17,9 @@ import datetime as dt
 import logging
 from typing import Optional
 
-import config
-import jira_client as jira
-import sheet_reader as sheet
+from src.utils import config
+from src.core import jira_client as jira
+from src.core import sheet_reader as sheet
 from sheet_reader import (
     SheetData,
     SyncLogEntry,

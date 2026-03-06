@@ -18,7 +18,7 @@ from typing import Optional
 import gspread
 from google.oauth2.service_account import Credentials
 
-import config
+from src.utils import config
 
 log = logging.getLogger(__name__)
 

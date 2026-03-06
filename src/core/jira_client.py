@@ -14,7 +14,7 @@ from typing import Any, Optional
 import requests
 from requests.auth import HTTPBasicAuth
 
-import config
+from src.utils import config
 
 log = logging.getLogger(__name__)
 

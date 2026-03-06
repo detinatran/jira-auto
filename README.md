@@ -39,7 +39,7 @@ Hệ thống tự động sync tasks giữa Google Sheets và Jira Cloud, tích 
 
 **Cách LLM generate JSON để query/update data:**
 
-System define Python functions với typed parameters và docstrings trong `llm_agent.py`:
+System define Python functions với typed parameters và docstrings trong [src/agents/llm_agent.py](src/agents/llm_agent.py):
 
 ```python
 def list_tasks(
@@ -261,26 +261,45 @@ You: Show me overdue tasks
 
 ```
 jira/
-├── main.py
-├── config.py
-├── sheet_reader.py
-├── jira_client.py
-├── sync_service.py
-├── llm_agent.py
-├── reporting.py
-├── .env
-├── service_account.json
-└── requirements.txt
+├── main.py                    # CLI entry point
+├── .env                       # Environment config (credentials)
+├── service_account.json       # Google service account key
+├── requirements.txt           # Python dependencies
+│
+├── src/                       # Source code
+│   ├── core/                  # Core business logic
+│   │   ├── jira_client.py    # Jira REST API wrapper
+│   │   ├── sheet_reader.py   # Google Sheets I/O
+│   │   ├── sync_service.py   # Sync orchestration logic
+│   │   └── reporting.py      # Analytics & terminal tables
+│   │
+│   ├── agents/                # AI agents
+│   │   └── llm_agent.py      # Gemini agent with function calling
+│   │
+│   └── utils/                 # Utilities
+│       └── config.py          # Environment config loader
+│
+├── scripts/                   # Utility scripts
+│   ├── _check.py             # Check sheet data
+│   ├── _fix_sheet.py         # Fix sheet formatting
+│   └── _reset_pending.py     # Reset sync status
+│
+├── docs/                      # Documentation
+│   └── problem.md            # Problem statement
+│
+└── images/                    # Demo images
+    ├── image.png             # Chat interface
+    ├── demo.jpg              # Result screenshot
+    ├── jira.jpg              # Jira board
+    └── sheet.jpg             # Google Sheet
 ```
 
-**File roles:**
-- `main.py` - CLI entry point
-- `config.py` - Environment config loader
-- `sheet_reader.py` - Google Sheets I/O
-- `jira_client.py` - Jira REST API wrapper
-- `sync_service.py` - Sync orchestration logic
-- `llm_agent.py` - Gemini agent with function calling
-- `reporting.py` - Analytics & terminal tables
+**Module roles:**
+- `main.py` - CLI entry point với command routing
+- `src/core/` - Core business logic (Jira, Sheets, Sync, Reporting)
+- `src/agents/` - AI agent implementations
+- `src/utils/` - Configuration và helper functions
+- `scripts/` - Maintenance và debugging tools
 
 ---
 
@@ -291,13 +310,13 @@ jira/
 ```
 Google Sheet (Tasks với sync_status="Pending")
     ↓
-sheet_reader.py: load_sheet() → Task objects
+src/core/sheet_reader.py: load_sheet() → Task objects
     ↓
-sync_service.py: sync_task_to_jira()
+src/core/sync_service.py: sync_task_to_jira()
     ├─ Resolve assignee/reporter via Jira API
     ├─ Normalize priority (Critical → Highest)
     ├─ Map status (Done → Resolved/Done based on workflow)
-    └─ jira_client.py: create_issue() hoặc update_issue()
+    └─ src/core/jira_client.py: create_issue() hoặc update_issue()
     ↓
 Write back: jira_issue_key, sync_status="Synced"
     ↓
@@ -403,7 +422,7 @@ All tools return JSON, Gemini formats thành natural language.
 System auto-resolve assignee by name lookup trong Jira. Nếu lookup fail, issue sẽ được tạo unassigned. Make sure team member names trong sheet match với Jira display names.
 
 ### Status transition fails
-Different Jira projects có different workflows. Check available transitions: error message sẽ show valid options. Update `STATUS_MAP` trong `jira_client.py` nếu cần.
+Different Jira projects có different workflows. Check available transitions: error message sẽ show valid options. Update `STATUS_MAP` trong [src/core/jira_client.py](src/core/jira_client.py) nếu cần.
 
 ### Google Sheets authentication error
 - Verify `service_account.json` valid
@@ -420,9 +439,9 @@ Free tier: 15 requests/minute. Nếu hit limits, wait 60 seconds hoặc upgrade 
 ### Run tests
 
 ```bash
-python sheet_reader.py
-python jira_client.py
-python sync_service.py
+python -m src.core.sheet_reader
+python -m src.core.jira_client
+python -m src.core.sync_service
 ```
 
 ### Enable debug logging
@@ -453,9 +472,9 @@ MIT
 
 ## Tips
 
-- Batch sync: Reset all tasks to "Pending" để re-sync everything
+- Batch sync: Reset all tasks to "Pending" để re-sync everything (`python scripts/_reset_pending.py`)
 - Dry-run mode: Remove Jira credentials để test sync logic without creating issues
 - Chat agent: Works offline với local sheet data nếu Jira credentials missing
-- Custom fields: Extend `Task` dataclass trong `sheet_reader.py` để add more fields
+- Custom fields: Extend `Task` dataclass trong [src/core/sheet_reader.py](src/core/sheet_reader.py) để add more fields
 - Webhooks: Add Flask endpoint để receive Jira webhooks for real-time updates
 # jira-auto

@@ -13,7 +13,7 @@ Mapping:
 """
 import gspread
 from google.oauth2.service_account import Credentials
-import config
+from src.utils import config
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",

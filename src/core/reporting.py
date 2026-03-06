@@ -18,9 +18,9 @@ from rich.table import Table
 from rich.panel import Panel
 from rich import box
 
-import config
-import jira_client as jira
-import sheet_reader as sheet
+from src.utils import config
+from src.core import jira_client as jira
+from src.core import sheet_reader as sheet
 from sheet_reader import SheetData
 
 log = logging.getLogger(__name__)

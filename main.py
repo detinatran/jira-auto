@@ -23,14 +23,14 @@ import sys
 
 from rich.console import Console
 
-import config
+from src.utils import config
 
 console = Console()
 
 
 def cmd_sync(args):
     """Run Sheet → Jira sync for all pending tasks."""
-    import sync_service
+    from src.core import sync_service
     console.print("[bold cyan]🔄 Syncing pending tasks to Jira...[/]\n")
 
     if not config.validate_jira_config():
@@ -51,13 +51,13 @@ def cmd_sync(args):
 
 def cmd_report(args):
     """Print the full analytics report."""
-    import reporting
+    from src.core import reporting
     reporting.full_report()
 
 
 def cmd_dashboard(args):
     """Print dashboard summary."""
-    import reporting
+    from src.core import reporting
     reporting.print_dashboard()
 
 
@@ -70,13 +70,13 @@ def cmd_chat(args):
         )
         sys.exit(1)
 
-    import llm_agent
+    from src.agents import llm_agent
     llm_agent.interactive_chat()
 
 
 def cmd_export(args):
     """Export the analytics report as JSON."""
-    import reporting
+    from src.core import reporting
     output = args.output or "report.json"
     report_json = reporting.export_report_json()
 
@@ -90,25 +90,25 @@ def cmd_export(args):
 
 def cmd_tasks(args):
     """Show all tasks table."""
-    import reporting
+    from src.core import reporting
     reporting.print_task_table()
 
 
 def cmd_overdue(args):
     """Show overdue tasks."""
-    import reporting
+    from src.core import reporting
     reporting.print_overdue_tasks()
 
 
 def cmd_team(args):
     """Show team workload."""
-    import reporting
+    from src.core import reporting
     reporting.print_team_workload()
 
 
 def cmd_logs(args):
     """Show sync log."""
-    import reporting
+    from src.core import reporting
     reporting.print_sync_log()
 
 
