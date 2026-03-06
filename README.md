@@ -6,6 +6,9 @@ Hệ thống tự động sync tasks giữa Google Sheets và Jira Cloud, tích 
 
 📊 **Google Sheet:** [Jira Integration Sheet](https://docs.google.com/spreadsheets/d/1IMWZ3POaPCHt2Gqa07QtRMLKCpcPcTXE01Q2WwH-uZY)
 
+### Chat Interface
+![Chat Demo](image.png)
+
 ### Jira Board
 ![Jira Board](jira.jpg)
 
