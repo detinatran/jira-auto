@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env from the project root
-_env_path = Path(__file__).resolve().parent / ".env"
+# Load .env from the project root (go up 2 levels from src/utils/)
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(_env_path)
 
 # ── Jira ────────────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ GOOGLE_SHEET_ID: str = os.getenv(
 )
 GOOGLE_SERVICE_ACCOUNT_FILE: str = os.getenv(
     "GOOGLE_SERVICE_ACCOUNT_FILE",
-    str(Path(__file__).resolve().parent / "service_account.json"),
+    str(Path(__file__).resolve().parent.parent.parent / "service_account.json"),
 )
 
 # ── Validation helpers ─────────────────────────────────────────────────────

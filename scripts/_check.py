@@ -1,4 +1,4 @@
-from sheet_reader import load_sheet
+from src.core.sheet_reader import load_sheet
 
 data = load_sheet()
 for t in data.tasks:
