@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Optional
 
 from google import genai
@@ -21,6 +22,8 @@ from src.core import sheet_reader as sheet
 from src.core.sheet_reader import SheetData
 
 log = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
 
 # ════════════════════════════════════════════════════════════════════════════
 #  Tool functions exposed to Gemini
@@ -46,6 +49,20 @@ def _reload_data() -> SheetData:
 
 # ── Query / read tools ─────────────────────────────────────────────────────
 
+def _safe_json(func):
+    """Decorator: catch exceptions inside tool functions and return JSON error."""
+    import functools
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as exc:
+            log.exception(f"Tool {func.__name__} failed")
+            return json.dumps({"error": f"{func.__name__} failed: {exc}"})
+    return wrapper
+
+
+@_safe_json
 def list_all_projects() -> str:
     """List all projects from the sheet with their key, owner, and status."""
     data = _load_data()
@@ -62,6 +79,7 @@ def list_all_projects() -> str:
     return json.dumps(projects, indent=2)
 
 
+@_safe_json
 def list_tasks(
     project_id: str = "",
     assignee: str = "",
@@ -111,6 +129,7 @@ def list_tasks(
     return json.dumps(result, indent=2)
 
 
+@_safe_json
 def get_task_detail(task_id: str) -> str:
     """Get full details of a single task by its task_id.
 
@@ -126,6 +145,7 @@ def get_task_detail(task_id: str) -> str:
     return json.dumps({"error": f"Task {task_id} not found"})
 
 
+@_safe_json
 def get_team_members() -> str:
     """List all team members with their roles and emails."""
     data = _load_data()
@@ -141,6 +161,7 @@ def get_team_members() -> str:
     return json.dumps(members, indent=2)
 
 
+@_safe_json
 def get_project_summary() -> str:
     """Return a summary of all tasks: counts by status, overdue tasks, etc."""
     data = _load_data()
@@ -148,6 +169,7 @@ def get_project_summary() -> str:
     return json.dumps(summary, indent=2)
 
 
+@_safe_json
 def get_sync_log(task_id: str = "") -> str:
     """Get synchronization log entries, optionally filtered by task_id.
 
@@ -174,6 +196,7 @@ def get_sync_log(task_id: str = "") -> str:
     return json.dumps(result, indent=2)
 
 
+@_safe_json
 def search_jira_issues(jql: str) -> str:
     """Search Jira issues using a JQL query.
 
@@ -188,6 +211,7 @@ def search_jira_issues(jql: str) -> str:
 
 # ── Write / mutation tools ─────────────────────────────────────────────────
 
+@_safe_json
 def create_jira_issue(
     project_key: str,
     summary: str,
@@ -232,6 +256,7 @@ def create_jira_issue(
     return json.dumps(resp, indent=2, default=str)
 
 
+@_safe_json
 def update_jira_issue(
     issue_key: str,
     summary: str = "",
@@ -277,6 +302,7 @@ def update_jira_issue(
     return json.dumps(results, indent=2, default=str)
 
 
+@_safe_json
 def get_jira_issue_detail(issue_key: str) -> str:
     """Fetch full details of a Jira issue from the Jira API.
 
@@ -379,9 +405,28 @@ class JiraAgent:
         transparently — Gemini decides which function to call, the SDK
         executes it locally, sends the result back, and returns the
         final text response.
+
+        Includes retry logic for rate-limit (429) errors.
         """
-        response = self._chat.send_message(message)
-        return response.text or "(no text response)"
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response = self._chat.send_message(message)
+                return response.text or "(no text response)"
+            except Exception as exc:
+                err_str = str(exc)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    # Parse retry delay from error message if available
+                    wait = 10 * attempt  # default backoff
+                    import re
+                    match = re.search(r'retryDelay.*?(\d+)', err_str)
+                    if match:
+                        wait = int(match.group(1)) + 2
+                    if attempt < MAX_RETRIES:
+                        log.info(f"Rate limited. Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
+                        print(f"⏳ Rate limited. Waiting {wait}s before retry ({attempt}/{MAX_RETRIES})...")
+                        time.sleep(wait)
+                        continue
+                raise
 
     def reset(self):
         """Start a fresh conversation."""
