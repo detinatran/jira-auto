@@ -270,6 +270,27 @@ def append_task_update(entry: TaskUpdate) -> None:
     _append_task_update_google(entry)
 
 
+def append_new_task(task: Task) -> None:
+    """Append a brand-new task row to the Tasks tab in Google Sheet."""
+    ss = _open_spreadsheet()
+    ws = ss.worksheet("Tasks")
+    ws.append_row([
+        task.task_id,
+        task.project_id,
+        task.task_name,
+        task.description,
+        task.assignee,
+        task.reporter,
+        task.priority,
+        task.status,
+        task.due_date,
+        task.jira_issue_key or "",
+        task.sync_status,
+        task.last_updated,
+    ])
+    log.info("Appended new task %s to Google Sheet", task.task_id)
+
+
 # ── Quick dump helpers ──────────────────────────────────────────────────────
 
 def tasks_to_dicts(tasks: list[Task]) -> list[dict]:

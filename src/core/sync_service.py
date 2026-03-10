@@ -20,7 +20,7 @@ from typing import Optional
 from src.utils import config
 from src.core import jira_client as jira
 from src.core import sheet_reader as sheet
-from sheet_reader import (
+from src.core.sheet_reader import (
     SheetData,
     SyncLogEntry,
     Task,

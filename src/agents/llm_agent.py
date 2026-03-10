@@ -286,6 +286,53 @@ def create_jira_issue(
 
 
 @_safe_json
+def write_task_to_sheet(
+    task_id: str,
+    project_id: str,
+    task_name: str,
+    description: str = "",
+    assignee: str = "",
+    reporter: str = "",
+    priority: str = "Medium",
+    status: str = "To Do",
+    due_date: str = "",
+    jira_issue_key: str = "",
+) -> str:
+    """Append a new task row to the Tasks tab of the Google Sheet.
+
+    Args:
+        task_id: Unique task ID (e.g. T020). Generate one if not provided.
+        project_id: Project ID (e.g. PROJ001).
+        task_name: Task title.
+        description: Task description.
+        assignee: Assignee name.
+        reporter: Reporter name.
+        priority: Priority (Critical, High, Medium, Low).
+        status: Status (To Do, In Progress, Done, Blocked).
+        due_date: Due date in YYYY-MM-DD format.
+        jira_issue_key: Jira issue key after creation (e.g. KAN-42).
+    """
+    import datetime
+    task = sheet.Task(
+        task_id=task_id,
+        project_id=project_id,
+        task_name=task_name,
+        description=description,
+        assignee=assignee,
+        reporter=reporter,
+        priority=priority,
+        status=status,
+        due_date=due_date,
+        jira_issue_key=jira_issue_key or None,
+        sync_status="Synced" if jira_issue_key else "Pending",
+        last_updated=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    sheet.append_new_task(task)
+    _reload_data()
+    return json.dumps({"status": "ok", "task_id": task_id, "appended_to_sheet": True})
+
+
+@_safe_json
 def update_jira_issue(
     issue_key: str,
     summary: str = "",
@@ -383,6 +430,7 @@ TOOLS = [
     get_sync_log,
     search_jira_issues,
     create_jira_issue,
+    write_task_to_sheet,
     update_jira_issue,
     get_jira_issue_detail,
 ]
@@ -488,30 +536,29 @@ class JiraAgent:
             return self._send_gemini(message)
     
     def _send_openai(self, message: str) -> str:
-        """Send message using OpenAI with function calling."""
+        """Send message using OpenAI with function calling (multi-round loop)."""
+        import inspect
         self._messages.append({"role": "user", "content": message})
-        
-        # Convert TOOLS to OpenAI format
+
+        # Build OpenAI tool schemas once
         tools_openai = []
         for func in TOOLS:
-            import inspect
             sig = inspect.signature(func)
-            params = {}
-            required = []
-            
+            params: dict = {}
+            required: list = []
             for name, param in sig.parameters.items():
-                param_type = "string"  # default
-                if param.annotation == int:
-                    param_type = "integer"
-                elif param.annotation == float:
-                    param_type = "number"
-                elif param.annotation == bool:
-                    param_type = "boolean"
-                
-                params[name] = {"type": param_type}
+                ann = param.annotation
+                if ann == int:
+                    ptype = "integer"
+                elif ann == float:
+                    ptype = "number"
+                elif ann == bool:
+                    ptype = "boolean"
+                else:
+                    ptype = "string"
+                params[name] = {"type": ptype}
                 if param.default == inspect.Parameter.empty:
                     required.append(name)
-            
             tools_openai.append({
                 "type": "function",
                 "function": {
@@ -521,49 +568,42 @@ class JiraAgent:
                         "type": "object",
                         "properties": params,
                         "required": required,
-                    }
-                }
+                    },
+                },
             })
-        
-        # Call OpenAI with tools
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=self._messages,
-            tools=tools_openai,
-            temperature=0.2,
-        )
-        
-        message_obj = response.choices[0].message
-        
-        # Handle function calls
-        if message_obj.tool_calls:
+
+        # Agentic loop — keep calling until no more tool_calls
+        for _ in range(MAX_RETRIES * 5):
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=self._messages,
+                tools=tools_openai,
+                temperature=0.2,
+            )
+            message_obj = response.choices[0].message
+
+            if not message_obj.tool_calls:
+                self._messages.append({"role": "assistant", "content": message_obj.content})
+                return message_obj.content or "(no response)"
+
+            # Execute every tool call in this round
             self._messages.append(message_obj)
-            
             for tool_call in message_obj.tool_calls:
                 func_name = tool_call.function.name
                 args = json.loads(tool_call.function.arguments)
-                
-                # Find and call the function
                 func = next((f for f in TOOLS if f.__name__ == func_name), None)
                 if func:
                     log.info(f"OpenAI calling tool: {func_name}({args})")
                     result = func(**args)
-                    self._messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result,
-                    })
-            
-            # Get final response after function calls
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=self._messages,
-                temperature=0.2,
-            )
-            message_obj = response.choices[0].message
-        
-        self._messages.append({"role": "assistant", "content": message_obj.content})
-        return message_obj.content or "(no response)"
+                else:
+                    result = json.dumps({"error": f"Unknown tool: {func_name}"})
+                self._messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result,
+                })
+
+        return "(max tool-call rounds reached)"
     
     def _send_gemini(self, message: str) -> str:
         """Send message using Gemini with function calling (includes retry)."""
@@ -582,7 +622,7 @@ class JiraAgent:
                         wait = int(match.group(1)) + 2
                     if attempt < MAX_RETRIES:
                         log.info(f"Rate limited. Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
-                        print(f"⏳ Rate limited. Waiting {wait}s before retry ({attempt}/{MAX_RETRIES})...")
+                        print(f"Rate limited. Waiting {wait}s before retry ({attempt}/{MAX_RETRIES})...")
                         time.sleep(wait)
                         continue
                 raise
@@ -616,7 +656,7 @@ def interactive_chat():
     
     agent = JiraAgent()
     provider_name = "OpenAI" if agent._provider == "openai" else "Gemini"
-    console.print(f"[bold cyan]🤖 Jira Assistant[/] ({provider_name} + Function Calling)")
+    console.print(f"[bold cyan]Jira Assistant[/] ({provider_name} + Function Calling)")
     console.print(f"Model: [dim]{agent._model}[/]")
     console.print("Type [bold]quit[/] or [bold]exit[/] to leave.\n")
 

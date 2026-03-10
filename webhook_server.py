@@ -113,5 +113,6 @@ def manual_trigger():
 
 if __name__ == "__main__":
     import os
-    port = int(os.getenv("WEBHOOK_PORT", 5000))
+    port = int(os.getenv("WEBHOOK_PORT", 5001))  # Changed default to 5001
+    log.info(f"Starting webhook server on port {port}...")
     app.run(host="0.0.0.0", port=port, debug=False)

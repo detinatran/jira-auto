@@ -10,3 +10,5 @@ __pycache__/
 # Editor
 .vscode/
 .DS_Store
+mcp-atlassian/
+mcp-google-sheets/

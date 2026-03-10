@@ -285,7 +285,7 @@ def search_user(query: str) -> list[dict]:
 
 if __name__ == "__main__":
     if not config.validate_jira_config():
-        print("⚠️  Jira credentials not configured. Set them in .env first.")
+        print("[WARN] Jira credentials not configured. Set them in .env first.")
     else:
         projects = list_projects()
         print(json.dumps(projects, indent=2))

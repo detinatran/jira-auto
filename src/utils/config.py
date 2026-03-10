@@ -14,6 +14,7 @@ load_dotenv(_env_path)
 JIRA_URL: str = os.getenv("JIRA_URL", "https://your-domain.atlassian.net")
 JIRA_EMAIL: str = os.getenv("JIRA_EMAIL", "")
 JIRA_API_TOKEN: str = os.getenv("JIRA_API_TOKEN", "")
+JIRA_DEFAULT_PROJECT: str = os.getenv("JIRA_DEFAULT_PROJECT", "")
 
 # ── Google AI Studio (Gemini) ──────────────────────────────────────────────
 GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
@@ -29,6 +30,10 @@ GOOGLE_SERVICE_ACCOUNT_FILE: str = os.getenv(
     "GOOGLE_SERVICE_ACCOUNT_FILE",
     str(Path(__file__).resolve().parent.parent.parent / "service_account.json"),
 )
+
+# ── MCP Server commands ────────────────────────────────────────────────────
+MCP_SHEET_COMMAND: str = os.getenv("MCP_SHEET_COMMAND", "mcp-google-sheets")
+MCP_JIRA_COMMAND: str = os.getenv("MCP_JIRA_COMMAND", "mcp-atlassian")
 
 # ── Validation helpers ─────────────────────────────────────────────────────
 def validate_jira_config() -> bool:

@@ -63,7 +63,7 @@ def print_dashboard(data: SheetData | None = None) -> None:
         f"[bold]Total Tasks:[/] {summary['total_tasks']}  |  "
         f"[bold]Pending Sync:[/] {summary['pending_sync']}  |  "
         f"[bold]Overdue:[/] [red]{len(overdue)}[/]",
-        title="📊 Project Dashboard",
+        title="Project Dashboard",
         border_style="cyan",
     ))
 
@@ -106,7 +106,7 @@ def print_task_table(data: SheetData | None = None) -> None:
             "Done": "green", "In Progress": "yellow",
             "Blocked": "red", "To Do": "dim",
         }.get(t.status, "white")
-        overdue_marker = " ⚠️" if _is_overdue(t.due_date, t.status) else ""
+        overdue_marker = " (!)" if _is_overdue(t.due_date, t.status) else ""
 
         tbl.add_row(
             t.task_id,
@@ -224,10 +224,10 @@ def print_overdue_tasks(data: SheetData | None = None) -> None:
     overdue = [t for t in data.tasks if _is_overdue(t.due_date, t.status)]
 
     if not overdue:
-        console.print("[green]✅ No overdue tasks![/]\n")
+        console.print("[green]No overdue tasks.[/]\n")
         return
 
-    tbl = Table(title="⚠️  Overdue Tasks", box=box.ROUNDED, border_style="red")
+    tbl = Table(title="Overdue Tasks", box=box.ROUNDED, border_style="red")
     tbl.add_column("Task ID", style="dim")
     tbl.add_column("Task", style="bold")
     tbl.add_column("Assignee")
